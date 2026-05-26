@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>岛岛小药箱 · 药品提醒生成器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background: linear-gradient(180deg, #e8f5e9 0%, #c8e6c9 30%, #a5d6a7 60%, #81c784 100%);
+  min-height:100vh;color:#5d4037;-webkit-tap-highlight-color:transparent;
+}
+body::before{
+  content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+  background:radial-gradient(ellipse at 20% 80%, rgba(255,183,77,0.15) 0%, transparent 50%),
+             radial-gradient(ellipse at 80% 20%, rgba(129,199,132,0.2) 0%, transparent 50%),
+             radial-gradient(ellipse at 50% 50%, rgba(255,241,118,0.1) 0%, transparent 60%);
+  pointer-events:none;z-index:0;
+}
+.container{max-width:520px;margin:0 auto;padding:16px 16px 80px;position:relative;z-index:1}
+
+/* Header */
+.header{text-align:center;padding:28px 0 16px}
+.header h1{font-size:26px;font-weight:800;color:#33691e;text-shadow:0 2px 0 rgba(255,255,255,0.5)}
+.header .sub{font-size:13px;color:#689f38;margin-top:4px}
+.header .island-icon{font-size:40px;display:block;margin-bottom:4px}
+
+/* Card */
+.card{
+  background:rgba(255,255,255,0.92);border-radius:22px;padding:20px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.08),0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom:16px;border:2px solid #c8e6c9;
+}
+.card-title{font-size:16px;font-weight:700;color:#33691e;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* Form elements */
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:13px;font-weight:600;color:#6d8c50;margin-bottom:5px}
+.form-group input,.form-group textarea{
+  width:100%;padding:10px 14px;border:2px solid #c8e6c9;border-radius:12px;
+  font-size:14px;color:#5d4037;background:#f9fdf7;outline:none;
+  transition:border-color 0.2s;font-family:inherit;
+}
+.form-group input:focus,.form-group textarea:focus{border-color:#81c784}
+.form-group textarea{resize:vertical;min-height:60px}
+
+/* Medicine row */
+.med-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.med-row input{flex:1;min-width:80px}
+.med-row .med-emoji{width:48px;flex:none;text-align:center}
+.med-row .med-dosage{width:80px;flex:none}
+.med-row .med-del{
+  width:34px;height:34px;flex:none;border:none;border-radius:50%;
+  background:#ffcdd2;color:#c62828;font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform 0.15s
+}
+.med-row .med-del:hover{transform:scale(1.1)}
+
+/* Buttons */
+.btn{
+  padding:10px 20px;border:none;border-radius:14px;font-size:14px;font-weight:700;
+  cursor:pointer;transition:all 0.2s;font-family:inherit;display:inline-flex;
+  align-items:center;gap:6px
+}
+.btn-primary{
+  background:linear-gradient(135deg, #66bb6a, #43a047);
+  color:#fff;box-shadow:0 3px 0 0 #2e7d32;
+}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 0 0 #2e7d32}
+.btn-primary:active{transform:translateY(1px);box-shadow:0 1px 0 0 #2e7d32}
+.btn-ghost{
+  background:rgba(255,255,255,0.7);color:#689f38;border:2px dashed #a5d6a7
+}
+.btn-block{width:100%;justify-content:center;padding:14px}
+.btn-sm{padding:6px 14px;font-size:12px}
+
+/* Date row */
+.date-row{display:flex;gap:10px}
+.date-row .form-group{flex:1}
+
+/* Checklist page (generated view) */
+.checklist-header{text-align:center;padding:20px 0 8px}
+.checklist-header .title{font-size:24px;font-weight:800;color:#33691e}
+.checklist-header .date-range{font-size:12px;color:#8d6e63;margin-top:4px}
+
+.notice-card{
+  background:#fff8e0;border-radius:20px;padding:14px 18px;margin-bottom:18px;
+  border:2px solid #f7cd67;box-shadow:0 3px 0 0 #e0b800;
+  font-size:13px;color:#725d42;line-height:1.8
+}
+.notice-title{font-size:14px;font-weight:700;color:#794f27;margin-bottom:6px}
+
+.day-card{
+  background:rgba(255,255,255,0.9);border-radius:18px;padding:14px 16px;
+  margin-bottom:10px;border:2px solid #e8f5e9;
+  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+}
+.day-card.today{border-color:#a5d6a7;background:rgba(232,245,233,0.6)}
+.day-card .day-label{
+  font-size:12px;font-weight:700;color:#8d6e63;margin-bottom:8px;
+  display:flex;justify-content:space-between;align-items:center
+}
+.day-card .day-label .day-date{color:#5d4037}
+.med-check{
+  display:flex;align-items:center;gap:8px;padding:6px 0;
+  font-size:14px;cursor:pointer;user-select:none;
+}
+.med-check .checkbox{
+  width:24px;height:24px;border-radius:8px;border:2px solid #a5d6a7;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s;flex:none;font-size:14px;
+}
+.med-check.done .checkbox{background:#81c784;border-color:#66bb6a;color:#fff}
+.med-check.done .med-name{text-decoration:line-through;color:#a5a5a5}
+.med-check .med-name{flex:1;font-weight:500}
+.med-check .med-dose{font-size:11px;color:#9e9e9e}
+
+.progress-bar{
+  height:8px;background:#e8f5e9;border-radius:4px;margin:12px 0;overflow:hidden
+}
+.progress-fill{
+  height:100%;background:linear-gradient(90deg, #66bb6a, #43a047);
+  border-radius:4px;transition:width 0.3s
+}
+.streak-badge{
+  display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+  background:#fff8e0;border-radius:10px;font-size:12px;font-weight:600;
+  color:#f57f17;border:1px solid #f7cd67;
+}
+
+.sync-bar{text-align:center;padding:8px;font-size:11px;color:#9f927d}
+
+/* Modal */
+.modal-overlay{
+  position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);
+  display:flex;align-items:center;justify-content:center;z-index:100
+}
+.modal{
+  background:#fff;border-radius:20px;padding:24px;max-width:360px;width:90%;
+  box-shadow:0 8px 32px rgba(0,0,0,0.15);text-align:center
+}
+.modal h3{color:#33691e;margin-bottom:12px}
+.modal p{font-size:13px;color:#8d6e63;margin-bottom:16px;line-height:1.6}
+.modal .link-box{
+  background:#f5f5f5;border-radius:10px;padding:10px;font-size:12px;
+  word-break:break-all;color:#5d4037;margin-bottom:12px;text-align:left
+}
+
+.footer-sea{height:40px}
+
+/* Toast */
+.toast{
+  position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:200;
+  background:#5d4037;color:#fff;padding:10px 20px;border-radius:12px;
+  font-size:13px;font-weight:600;animation:toastIn 0.3s ease;
+  box-shadow:0 4px 12px rgba(0,0,0,0.2)
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+.hidden{display:none !important}
+
+.back-btn{
+  display:inline-flex;align-items:center;gap:4px;padding:8px 14px;
+  background:rgba(255,255,255,0.6);border:none;border-radius:12px;
+  font-size:13px;color:#689f38;cursor:pointer;font-weight:600;font-family:inherit;
+  margin-bottom:8px
+}
+
+@media(max-width:400px){
+  .container{padding:12px 10px 80px}
+  .med-row{flex-wrap:wrap}
+  .med-row .med-dosage{width:70px}
+}
+</style>
+</head>
+<body>
+
+<div class="container" id="app"></div>
+
+<script>
+// ============ STATE ============
+const GIST_API = 'https://api.github.com/gists';
+let gistToken = '';
+let currentGistId = null;
+let currentMode = 'form'; // 'form' | 'checklist'
+let checklistData = null;
+
+// ============ INIT ============
+function init(){
+  const hash = location.hash.slice(1);
+  const params = new URLSearchParams(hash);
+  
+  // Check for token in hash
+  if(params.has('token')){
+    gistToken = params.get('token');
+    localStorage.setItem('med_maker_token', gistToken);
+    // Clean URL
+    params.delete('token');
+    const newHash = params.toString();
+    location.replace(location.pathname + (newHash ? '#' + newHash : ''));
+    return;
+  }
+  
+  // Load token from localStorage
+  gistToken = localStorage.getItem('med_maker_token') || '';
+  
+  if(params.has('gist')){
+    currentGistId = params.get('gist');
+    currentMode = 'checklist';
+    loadChecklist();
+  } else {
+    currentMode = 'form';
+    renderForm();
+  }
+}
+
+// ============ RENDER FORM ============
+let medCount = 3;
+function renderForm(){
+  const myLists = getMyLists();
+  
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <span class="island-icon">🏝️</span>
+      <h1>岛岛小药箱</h1>
+      <div class="sub">定制你的专属药品提醒</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💊 药品列表</div>
+      <div id="medList">
+        ${[1,2,3].map(i => medRowHTML(i)).join('')}
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="addMed()" style="margin-top:8px">＋ 添加药品</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📅 服药周期</div>
+      <div class="date-row">
+        <div class="form-group">
+          <label>开始日期</label>
+          <input type="date" id="startDate" value="${todayStr()}">
+        </div>
+        <div class="form-group">
+          <label>结束日期</label>
+          <input type="date" id="endDate" value="${daysFromNow(30)}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📝 备注 / 用药提示</div>
+      <textarea id="notes" placeholder="例如：空腹抽血，抽完血再服①和②；每日两包；每日一颗..."></textarea>
+    </div>
+
+    <button class="btn btn-primary btn-block" onclick="generateChecklist()" style="margin-top:8px">
+      ✨ 生成我的专属药箱
+    </button>
+
+    ${myLists.length > 0 ? `
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">📋 我的药箱</div>
+      ${myLists.map(l => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e8f5e9">
+          <div>
+            <div style="font-weight:600;font-size:14px">${escHtml(l.title)}</div>
+            <div style="font-size:11px;color:#9e9e9e">${l.date} · ${l.meds}种药</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="location.href='#gist=${l.gistId}'">打开</button>
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
+
+    ${!gistToken ? `
+    <div class="card" style="margin-top:12px;background:#fff8e0;border-color:#f7cd67">
+      <div class="card-title">🔑 首次使用</div>
+      <p style="font-size:12px;color:#725d42;line-height:1.6">
+        需要 GitHub Token 才能保存数据。<br>
+        请用 <code style="background:#f5f5f5;padding:2px 6px;border-radius:4px">#token=你的token</code> 链接打开本页面。<br>
+        <a href="https://github.com/settings/tokens/new" target="_blank" style="color:#43a047">→ 去生成 Token（勾选 gist）</a>
+      </p>
+    </div>
+    ` : ''}
+  `;
+}
+
+function medRowHTML(i){
+  return `
+    <div class="med-row" id="medRow${i}">
+      <input class="med-emoji" placeholder="🌸" maxlength="2" id="emoji${i}" value="${['🌸','💉','🍵'][i-1] || '💊'}">
+      <input placeholder="药品名" id="name${i}" value="${['芬吗通灰片','肝素','中药'][i-1] || ''}">
+      <input class="med-dosage" placeholder="用量" id="dose${i}" value="${['①和②','暂不使用','每日两包'][i-1] || ''}">
+      ${i > 1 ? `<button class="med-del" onclick="removeMed(${i})">×</button>` : ''}
+    </div>`;
+}
+
+function addMed(){
+  medCount++;
+  const div = document.createElement('div');
+  div.innerHTML = medRowHTML(medCount);
+  document.getElementById('medList').appendChild(div.firstElementChild);
+}
+
+function removeMed(i){
+  const el = document.getElementById('medRow'+i);
+  if(el) el.remove();
+}
+
+function getMyLists(){
+  try{
+    return JSON.parse(localStorage.getItem('med_maker_lists') || '[]');
+  }catch(e){return [];}
+}
+
+function saveMyList(title, gistId, meds, date){
+  const lists = getMyLists();
+  lists.unshift({title, gistId, meds, date, ts:Date.now()});
+  // Keep max 20
+  if(lists.length > 20) lists.length = 20;
+  localStorage.setItem('med_maker_lists', JSON.stringify(lists));
+}
+
+// ============ GENERATE ============
+async function generateChecklist(){
+  if(!gistToken){
+    showToast('请先设置 GitHub Token（用 #token=xxx 链接打开）');
+    return;
+  }
+  
+  const medicines = [];
+  for(let i=1; i<=medCount; i++){
+    const nameEl = document.getElementById('name'+i);
+    if(!nameEl || !nameEl.value.trim()) continue;
+    medicines.push({
+      id: 'med'+i,
+      emoji: document.getElementById('emoji'+i)?.value || '💊',
+      name: nameEl.value.trim(),
+      dose: document.getElementById('dose'+i)?.value || ''
+    });
+  }
+  
+  if(medicines.length === 0){
+    showToast('请至少添加一种药品');
+    return;
+  }
+  
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
+  const notes = document.getElementById('notes').value.trim();
+  
+  if(!startDate || !endDate){
+    showToast('请选择开始和结束日期');
+    return;
+  }
+  if(startDate > endDate){
+    showToast('开始日期不能晚于结束日期');
+    return;
+  }
+  
+  const config = {
+    version: 1,
+    title: '岛岛小药箱',
+    medicines,
+    startDate,
+    endDate,
+    notes,
+    createdAt: new Date().toISOString()
+  };
+  
+  const gistData = {
+    description: '岛岛小药箱 · ' + medicines.map(m=>m.name).join('、'),
+    public: false,
+    files: {
+      'med-maker-data.json': {
+        content: JSON.stringify({config, checks: {}}, null, 2)
+      }
+    }
+  };
+  
+  try{
+    showToast('正在生成...');
+    const resp = await fetch(GIST_API, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'token ' + gistToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      body: JSON.stringify(gistData)
+    });
+    
+    if(!resp.ok){
+      const err = await resp.json();
+      showToast('创建失败：' + (err.message || '请检查 Token 权限（需要 gist）'));
+      return;
+    }
+    
+    const gist = await resp.json();
+    const gistId = gist.id;
+    
+    // Save to my lists
+    saveMyList(config.title, gistId, medicines.length, startDate + ' ~ ' + endDate);
+    
+    // Redirect to checklist view
+    location.hash = 'gist=' + gistId;
+    
+  }catch(e){
+    showToast('网络错误：' + e.message);
+  }
+}
+
+// ============ LOAD CHECKLIST ============
+async function loadChecklist(){
+  if(!gistToken){
+    renderNoToken();
+    return;
+  }
+  
+  try{
+    const resp = await fetch(`${GIST_API}/${currentGistId}`, {
+      headers: {
+        'Authorization': 'token ' + gistToken,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    
+    if(!resp.ok){
+      renderError('无法加载药箱数据，请检查链接是否正确');
+      return;
+    }
+    
+    const gist = await resp.json();
+    const file = gist.files['med-maker-data.json'];
+    if(!file){
+      renderError('数据文件不存在');
+      return;
+    }
+    
+    checklistData = JSON.parse(file.content);
+    renderChecklist();
+    
+  }catch(e){
+    renderError('加载失败：' + e.message);
+  }
+}
+
+function renderNoToken(){
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <span class="island-icon">🏝️</span>
+      <h1>岛岛小药箱</h1>
+    </div>
+    <div class="card" style="background:#fff8e0;border-color:#f7cd67;text-align:center">
+      <div class="card-title">🔑 需要 Token</div>
+      <p style="font-size:13px;color:#725d42;line-height:1.8">
+        查看药箱需要 GitHub Token。<br>
+        请在链接后添加 <code style="background:#f5f5f5;padding:2px 6px;border-radius:4px">#token=你的token</code><br><br>
+        <a href="https://github.com/settings/tokens/new" target="_blank" style="color:#43a047">→ 去生成 Token（勾选 gist）</a>
+      </p>
+    </div>
+    <button class="btn btn-ghost btn-block" onclick="location.hash=''">← 返回首页</button>
+  `;
+}
+
+function renderError(msg){
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <span class="island-icon">😿</span>
+      <h1>出错了</h1>
+    </div>
+    <div class="card" style="text-align:center">
+      <p style="color:#c62828">${msg}</p>
+    </div>
+    <button class="btn btn-ghost btn-block" onclick="location.hash=''">← 返回首页</button>
+  `;
+}
+
+// ============ RENDER CHECKLIST ============
+function renderChecklist(){
+  const {config, checks} = checklistData;
+  const today = todayStr();
+  const days = getDaysInRange(config.startDate, config.endDate);
+  
+  // Calculate stats
+  let totalChecks = 0, doneChecks = 0;
+  days.forEach(d => {
+    config.medicines.forEach(m => {
+      totalChecks++;
+      if(checks[d] && checks[d][m.id]) doneChecks++;
+    });
+  });
+  
+  // Calculate streak
+  let streak = 0;
+  const todayIdx = days.indexOf(today);
+  const checkDay = todayIdx >= 0 ? todayIdx : days.length - 1;
+  for(let i = checkDay; i >= 0; i--){
+    const d = days[i];
+    const dayChecks = checks[d] || {};
+    const allDone = config.medicines.every(m => dayChecks[m.id]);
+    if(allDone) streak++;
+    else break;
+  }
+  
+  const title = config.title || '岛岛小药箱';
+  
+  document.getElementById('app').innerHTML = `
+    <button class="back-btn" onclick="location.hash=''">← 返回首页</button>
+    
+    <div class="checklist-header">
+      <div class="title">${escHtml(title)}</div>
+      <div class="date-range">${config.startDate} → ${config.endDate} · ${config.medicines.length}种药品</div>
+      ${streak > 0 ? `<div style="margin-top:8px"><span class="streak-badge">🔥 连续全勤 ${streak} 天</span></div>` : ''}
+    </div>
+    
+    <div class="progress-bar">
+      <div class="progress-fill" style="width:${totalChecks>0 ? Math.round(doneChecks/totalChecks*100) : 0}%"></div>
+    </div>
+    <div style="text-align:center;font-size:12px;color:#8d6e63;margin-bottom:12px">
+      总进度 ${doneChecks}/${totalChecks}（${totalChecks>0 ? Math.round(doneChecks/totalChecks*100) : 0}%）
+    </div>
+    
+    ${config.notes ? `
+    <div class="notice-card">
+      <div class="notice-title">⚠️ 用药提示</div>
+      <div style="white-space:pre-wrap">${escHtml(config.notes)}</div>
+    </div>
+    ` : ''}
+    
+    <div id="daysContainer">
+      ${days.map(d => renderDayCard(d, config, checks, d === today)).join('')}
+    </div>
+    
+    <div class="footer-sea"></div>
+    <div class="sync-bar"><span id="syncStatus">☁️ 自动保存中...</span></div>
+    
+    <div style="text-align:center;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" onclick="shareLink()">🔗 复制分享链接</button>
+    </div>
+  `;
+}
+
+function renderDayCard(dateStr, config, checks, isToday){
+  const dayChecks = checks[dateStr] || {};
+  const d = new Date(dateStr + 'T00:00:00');
+  const weekday = ['日','一','二','三','四','五','六'][d.getDay()];
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const allDone = config.medicines.every(m => dayChecks[m.id]);
+  
+  return `
+    <div class="day-card${isToday ? ' today' : ''}">
+      <div class="day-label">
+        <span>${month}月${day}日 周${weekday} ${isToday ? '👈 今天' : ''}</span>
+        ${allDone ? '<span style="color:#66bb6a;font-size:11px">✅ 全勤</span>' : ''}
+      </div>
+      ${config.medicines.map(m => {
+        const done = dayChecks[m.id];
+        return `
+          <div class="med-check${done ? ' done' : ''}" onclick="toggleCheck('${dateStr}','${m.id}')">
+            <div class="checkbox">${done ? '✓' : ''}</div>
+            <span class="med-name">${m.emoji} ${escHtml(m.name)}</span>
+            ${m.dose ? `<span class="med-dose">${escHtml(m.dose)}</span>` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// ============ CHECK TOGGLE ============
+async function toggleCheck(dateStr, medId){
+  if(!checklistData || !gistToken) return;
+  
+  // Ensure checks object exists
+  if(!checklistData.checks[dateStr]) checklistData.checks[dateStr] = {};
+  
+  // Toggle
+  checklistData.checks[dateStr][medId] = !checklistData.checks[dateStr][medId];
+  
+  // Re-render
+  renderChecklist();
+  
+  // Save to Gist
+  await saveToGist();
+}
+
+async function saveToGist(){
+  if(!currentGistId || !gistToken) return;
+  
+  const statusEl = document.getElementById('syncStatus');
+  if(statusEl) statusEl.textContent = '☁️ 保存中...';
+  
+  try{
+    const resp = await fetch(`${GIST_API}/${currentGistId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'token ' + gistToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      body: JSON.stringify({
+        files: {
+          'med-maker-data.json': {
+            content: JSON.stringify(checklistData, null, 2)
+          }
+        }
+      })
+    });
+    
+    if(resp.ok){
+      if(statusEl) statusEl.textContent = '☁️ 已保存 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+    } else {
+      if(statusEl) statusEl.textContent = '⚠️ 保存失败，请检查网络';
+    }
+  }catch(e){
+    if(statusEl) statusEl.textContent = '⚠️ 保存失败';
+  }
+}
+
+// ============ SHARE ============
+function shareLink(){
+  const url = location.origin + location.pathname + '#gist=' + currentGistId;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(() => showToast('链接已复制！发送给朋友即可分享'));
+  } else {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('链接已复制！');
+  }
+}
+
+// ============ UTILS ============
+function todayStr(){
+  return new Date().toISOString().slice(0,10);
+}
+
+function daysFromNow(n){
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+
+function getDaysInRange(start, end){
+  const days = [];
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end + 'T00:00:00');
+  while(s <= e){
+    days.push(s.toISOString().slice(0,10));
+    s.setDate(s.getDate() + 1);
+  }
+  return days;
+}
+
+function escHtml(s){
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function showToast(msg){
+  const existing = document.querySelector('.toast');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+// ============ START ============
+init();
+</script>
+</body>
+</html>
